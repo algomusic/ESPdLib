@@ -27,8 +27,8 @@
 #define POT_FREQ_PIN    1
 #define POT_AMP_PIN     2
 #define POT_DETUNE_PIN  3
-#define BUTTON_PIN      4
-#define LED_PIN         8
+#define BUTTON_PIN      20
+#define LED_PIN         47
 
 void* patch = nullptr;
 bool lastButton = false;
@@ -57,9 +57,9 @@ void setup() {
 
     ESPdLib::Config config;
     config.sampleRate = 48000;
-    config.bclkPin = 7;
-    config.wsPin = 6;
-    config.doutPin = 5;
+    config.bclkPin = 38;
+    config.wsPin = 39;
+    config.doutPin = 40;
 
     if (!Pd.begin(config)) {
         Serial.println("ERROR: ESPdLib init failed!");

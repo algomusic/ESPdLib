@@ -170,6 +170,7 @@ void ensureFallbackPatch() {
 }
 
 float prevFreq = 440.0;
+unsigned long lastCpuCheck = millis();
 
 void setup() {
     Serial.begin(115200);
@@ -244,6 +245,7 @@ void loop() {
     prevFreq = freq;
     float amp = rawAmp / 4095.0;
     float cutoff = 50 + pow(rawCutoff / 4095.0, 2) * 10000.0;
+    // Serial.println("amp " + String(amp) +  " cut " + String(cutoff));
 
     // Send values to Pd [r freq] and [r amp] receivers
     Pd.sendFloat("freq", freq);
@@ -273,6 +275,11 @@ void loop() {
                 buildPatchList();
             }
         }
+    }
+
+    if (millis() - lastCpuCheck > 10000) {
+        lastCpuCheck = millis();
+        Serial.println("CPU load " + String(Pd.getCpuLoad()));
     }
 
     delay(20);  // ~50 Hz control rate

@@ -340,9 +340,13 @@ void ESPdLib::audioTaskFunc(void* param) {
     const int outSamples = PD_BLOCK_SIZE * outChannels;
     const int inSamples = PD_BLOCK_SIZE * inChannels;
 
-    int16_t outBuffer[PD_BLOCK_SIZE * 2]; // max stereo
-    int16_t inBuffer[PD_BLOCK_SIZE * 2];  // max stereo
-    memset(inBuffer, 0, sizeof(inBuffer));
+    // Use float buffers for Pd processing, then clamp to int16 for I2S.
+    // libpd_process_short does NOT clamp — values outside -1..1 overflow int16,
+    // causing harsh digital distortion. We process as float and clamp properly.
+    float outFloatBuf[PD_BLOCK_SIZE * 2];  // max stereo
+    float inFloatBuf[PD_BLOCK_SIZE * 2];   // max stereo
+    int16_t outBuffer[PD_BLOCK_SIZE * 2];
+    memset(inFloatBuf, 0, sizeof(inFloatBuf));
 
     // Tick duration in microseconds for CPU load calculation
     const float tickUs = (float)PD_BLOCK_SIZE / impl->config.sampleRate * 1000000.0f;
@@ -351,16 +355,28 @@ void ESPdLib::audioTaskFunc(void* param) {
         // Drain queued messages from the main thread
         self->drainMessageQueue();
 
-        // Read audio input if configured
+        // Read audio input if configured (convert int16 from I2S to float for Pd)
         if (inChannels > 0) {
-            pd_audio_read(inBuffer, inSamples);
+            int16_t inI2sBuf[PD_BLOCK_SIZE * 2];
+            pd_audio_read(inI2sBuf, inSamples);
+            for (int i = 0; i < inSamples; i++) {
+                inFloatBuf[i] = inI2sBuf[i] / 32767.0f;
+            }
         }
 
-        // Process one Pd tick (64 samples)
+        // Process one Pd tick (64 samples) using float precision
         unsigned long t0 = micros();
-        pdw_process_short(1, inBuffer, outBuffer);
+        pdw_process_float(1, inFloatBuf, outFloatBuf);
         unsigned long elapsed = micros() - t0;
         impl->cpuLoad = (float)elapsed / tickUs;
+
+        // Convert float (-1.0..1.0) to int16 with clamping
+        for (int i = 0; i < outSamples; i++) {
+            float s = outFloatBuf[i];
+            if (s > 1.0f) s = 1.0f;
+            else if (s < -1.0f) s = -1.0f;
+            outBuffer[i] = (int16_t)(s * 32767.0f);
+        }
 
         // Write audio output
         pd_audio_write(outBuffer, outSamples);

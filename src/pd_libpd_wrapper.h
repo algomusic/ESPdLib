@@ -26,6 +26,7 @@ void pdw_closefile(void *p);
 
 /* Audio Processing */
 int pdw_process_short(int ticks, const short *inBuffer, short *outBuffer);
+int pdw_process_float(int ticks, const float *inBuffer, float *outBuffer);
 
 /* Messaging */
 int pdw_bang(const char *recv);

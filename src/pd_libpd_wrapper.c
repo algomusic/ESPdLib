@@ -40,6 +40,10 @@ int pdw_process_short(int ticks, const short *inBuffer, short *outBuffer) {
     return libpd_process_short(ticks, inBuffer, outBuffer);
 }
 
+int pdw_process_float(int ticks, const float *inBuffer, float *outBuffer) {
+    return libpd_process_float(ticks, inBuffer, outBuffer);
+}
+
 /* ===== Messaging ===== */
 
 int pdw_bang(const char *recv) {
