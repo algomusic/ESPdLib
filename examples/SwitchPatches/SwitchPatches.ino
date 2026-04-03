@@ -1,5 +1,5 @@
 /*
- * SimpleExample - ESPdLib Example
+ * SwitchPatches - ESPdLib Example
  *
  * Loads a Pure Data patch and plays audio through I2S. Potentiometers on
  * GPIO1, GPIO2 and GPIO3 control frequency (100-2000 Hz), amplitude (0-1), cutoff (50 - 1000 Hz)
@@ -60,20 +60,14 @@
 
 // ---- Default fallback patch ----
 // Embedded in the sketch so there's always something to play, even before
-// any .pd files have been uploaded to LittleFS.
-// Patch: [r freq] -> [osc~] -> [*~] -> [dac~], with [r amp] controlling gain.
+// any .pd files have been uploaded to the ESP32 with LittleFS.
+// Patch: [osc~ 440] -> [dac~].
 static const char DEFAULT_PATCH[] =
-    "#N canvas 64 96 450 300 12;\n"
-    "#X obj 145 30 r freq;\n"
-    "#X obj 145 55 osc~;\n"
-    "#X obj 145 80 *~;\n"
-    "#X obj 145 105 dac~;\n"
-    "#X obj 200 55 r amp;\n"
+    "#N canvas 597 423 450 300 12;\n"
+    "#X obj 147 121 osc~ 440;\n"
+    "#X obj 147 145 dac~;\n"
     "#X connect 0 0 1 0;\n"
-    "#X connect 1 0 2 0;\n"
-    "#X connect 2 0 3 0;\n"
-    "#X connect 2 0 3 1;\n"
-    "#X connect 4 0 2 1;\n";
+    "#X connect 0 0 1 1;\n"
 static const char DEFAULT_PATCH_NAME[] = "simple-sinewave.pd";
 
 // ---- Globals ----
