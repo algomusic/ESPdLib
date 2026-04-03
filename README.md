@@ -44,7 +44,7 @@ void loop() {
 
 2. **Serial Upload** -- Send patches at runtime without recompiling: `python3 scripts/upload_patch.py /dev/cu.usbmodem* my-patch.pd`
 
-3. **Embedded Fallback** -- A default sinewave patch is compiled into the example sketch and auto-written to LittleFS if no patches are found.
+3. **Embedded Fallback** -- A default sinewave patch is compiled into the EmbeddedExample sketch and auto-written to LittleFS if no patches are found.
 
 ## Pd Patch Requirements
 
