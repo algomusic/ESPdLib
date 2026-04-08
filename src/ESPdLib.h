@@ -23,6 +23,11 @@ struct ESPdLibConfig {
     int wsPin             = 6;
     int doutPin           = 5;
     int dinPin            = -1;  // -1 = no audio input
+    // Internal DAC output (ESP32 GPIO25/26, ESP32-S2 GPIO17/18)
+    // When true, audio is routed to the chip's built-in 8-bit DAC instead of
+    // an external I2S DAC. I2S pin settings are ignored. No audio input.
+    // On chips without internal DAC (S3, C3, etc.) begin() will fail.
+    bool useInternalDAC   = false;
     // FreeRTOS audio task settings
     // Defaults to core 1 on dual-core chips, core 0 on single-core (ESP32-S2, C3)
     int audioTaskCore     = (portNUM_PROCESSORS > 1) ? 1 : 0;

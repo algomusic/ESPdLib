@@ -4,6 +4,8 @@
  * Plays a 440 Hz sine wave through I2S using the sine-tone.pd patch.
  * Upload the data/ folder to LittleFS first:
  *   Cmd+Shift+P -> "Upload LittleFS to Pico/ESP8266/ESP32"
+ *   Ensure that no Arduino sketch has the Serial Monitor open
+ *   Older ESP32s may require a slower upload speed
  *
  * Hardware:
  *   - ESP32 board

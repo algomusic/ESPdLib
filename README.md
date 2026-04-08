@@ -9,6 +9,7 @@ Build audio synthesizers, effects, and interactive sound installations by design
 - Load and hot-swap `.pd` patches stored on LittleFS flash
 - Send/receive floats, bangs, and symbols between Arduino code and Pd patches
 - Stereo I2S audio output (16-bit, configurable sample rate)
+- Internal DAC output on ESP32/ESP32-S2 (8-bit, no external hardware needed)
 - Dedicated FreeRTOS audio task for glitch-free playback
 - Thread-safe message queue for control from `loop()`
 - PSRAM support for large tables, delay lines, and samplers
@@ -59,9 +60,24 @@ No FFT, networking, external libraries, or GUI objects -- headless audio only.
 
 ## Hardware
 
-- Any ESP32 board with I2S output (ESP32, S2, S3, C3, C6)
+### External I2S DAC (default)
+
+- Any ESP32 board (ESP32, S2, S3, C3, C6)
 - I2S DAC module (MAX98357A, PCM5102, UDA1334A, etc.)
 - Configurable I2S pins via `config.bclkPin`, `config.wsPin`, `config.doutPin`
+
+### Internal DAC (no external hardware)
+
+- ESP32 (GPIO25 = left, GPIO26 = right) or ESP32-S2 (GPIO17 = left, GPIO18 = right)
+- Set `config.useInternalDAC = true` — I2S pin settings are ignored
+- 8-bit output resolution (lower quality than external I2S DAC)
+- Not available on ESP32-S3, C3, C6, or other chips without a built-in DAC
+
+```cpp
+ESPdLib::Config config;
+config.useInternalDAC = true;
+Pd.begin(config);
+```
 
 ## Requirements
 

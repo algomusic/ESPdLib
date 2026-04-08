@@ -127,14 +127,25 @@ bool ESPdLib::begin(const Config& config) {
     pdw_add_float(1);
     pdw_finish_message("pd", "dsp");
 
-    // Initialize I2S audio output
-    if (!pd_audio_init(config.sampleRate, config.numOutputChannels, config.numInputChannels,
-                       config.bclkPin, config.wsPin, config.doutPin, config.dinPin)) {
-        Serial.println("ESPdLib: I2S init failed");
-        delete _impl;
-        _impl = nullptr;
-        s_impl = nullptr;
-        return false;
+    // Initialize audio output
+    if (config.useInternalDAC) {
+        if (!pd_audio_init_dac(config.sampleRate, config.numOutputChannels)) {
+            Serial.println("ESPdLib: internal DAC init failed (unsupported chip?)");
+            delete _impl;
+            _impl = nullptr;
+            s_impl = nullptr;
+            return false;
+        }
+        Serial.println("ESPdLib: using internal DAC (8-bit output)");
+    } else {
+        if (!pd_audio_init(config.sampleRate, config.numOutputChannels, config.numInputChannels,
+                           config.bclkPin, config.wsPin, config.doutPin, config.dinPin)) {
+            Serial.println("ESPdLib: I2S init failed");
+            delete _impl;
+            _impl = nullptr;
+            s_impl = nullptr;
+            return false;
+        }
     }
 
     // Start audio processing task
@@ -167,7 +178,11 @@ void ESPdLib::end() {
         _impl->audioTask = NULL;
     }
 
-    pd_audio_deinit();
+    if (_impl->config.useInternalDAC) {
+        pd_audio_deinit_dac();
+    } else {
+        pd_audio_deinit();
+    }
     LittleFS.end();
 
     s_impl = nullptr;
@@ -379,7 +394,11 @@ void ESPdLib::audioTaskFunc(void* param) {
         }
 
         // Write audio output
-        pd_audio_write(outBuffer, outSamples);
+        if (impl->config.useInternalDAC) {
+            pd_audio_write_dac(outBuffer, outSamples);
+        } else {
+            pd_audio_write(outBuffer, outSamples);
+        }
     }
 
     vTaskDelete(NULL);
