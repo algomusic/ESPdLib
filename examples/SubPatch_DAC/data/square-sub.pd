@@ -1,0 +1,15 @@
+#N canvas 102 327 450 300 12;
+#X obj 141 69 osc~ 440;
+#X obj 136 185 dac~;
+#N canvas 121 154 450 300 square 0;
+#X obj 43 36 inlet~;
+#X obj 44 63 *~ 5;
+#X obj 44 87 clip~ -1 1;
+#X obj 44 111 outlet~;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X connect 2 0 3 0;
+#X restore 141 112 pd square;
+#X connect 0 0 2 0;
+#X connect 2 0 1 0;
+#X connect 2 0 1 1;
