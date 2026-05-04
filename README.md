@@ -2,7 +2,9 @@
 
 An Arduino library that runs [Pure Data](https://puredata.info/) (Pd) patches on ESP32 microcontrollers with I2S audio output.
 
-Build audio synthesizers, effects, and interactive sound installations by designing patches in Pd on your computer, then running them on an ESP32 with real-time parameter control from GPIO, sensors, or serial.
+Build audio synthesisers, effects, and interactive sound installations by designing patches in Pd on your computer, then running them on an ESP32 with real-time parameter control from GPIO, sensors, or serial.
+
+Adapted from [ESPd](https://msp.ucsd.edu/ideas/2024.09.18.espd/index.htm) by Miller Puckette for the Arduino IDE.
 
 ## Features
 
@@ -56,7 +58,7 @@ Patches must use `[receive]` objects (not GUI elements) to accept values from Ar
                         [r amp] --^
 ```
 
-No FFT, networking, external libraries, or GUI objects -- headless audio only.
+No FFT, networking, external libraries, or GUI objects -- headless audio only. Sub patches are supported, abstractions are not.
 
 ## Hardware
 
