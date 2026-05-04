@@ -10,6 +10,7 @@
  * Hardware:
  *   - ESP32 board
  *   - I2S DAC (e.g., MAX98357A or PCM5102) on pins BCLK=38, WS=39, DOUT=40
+ *   - or internal DAC on original ESP32 on pins 25 & 26 or Left and Right
  */
 
 #include <ESPdLib.h>
@@ -22,6 +23,7 @@ void setup() {
     config.bclkPin = 38;
     config.wsPin = 39;
     config.doutPin = 40;
+    // config.useInternalDAC = true;   // Uncomment to route output to GPIO25 (L) / GPIO26 (R) on OG ESP32
 
     if (!Pd.begin(config)) {
         Serial.println("ESPdLib init failed!");
@@ -37,5 +39,5 @@ void setup() {
 }
 
 void loop() {
-    delay(1000);
+    delay(1000); // do nothing, audio processesing is done in the background
 }
