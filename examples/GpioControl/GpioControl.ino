@@ -43,7 +43,7 @@ void onPdFloat(const char* source, float value) {
     if (strcmp(source, "level") == 0) {
         digitalWrite(LED_PIN, HIGH);
         // LED will be turned off in loop()
-    }
+    } else digitalWrite(LED_PIN, LOW);
 }
 
 void setup() {
@@ -99,7 +99,7 @@ void loop() {
     // Button trigger (active low, edge detection)
     bool button = !digitalRead(BUTTON_PIN);
     if (button && !lastButton) {
-        Pd.sendFloat("trigger", 1.0);
+        Pd.sendFloat("trigger", button);
         Serial.println("Button pressed -> trigger");
     }
     lastButton = button;
