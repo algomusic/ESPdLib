@@ -43,5 +43,5 @@ void setup() {
 }
 
 void loop() {
-    delay(1000);
+    delay(1000); // do nothing, audio processesing is done in the background
 }
