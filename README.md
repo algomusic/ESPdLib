@@ -4,7 +4,7 @@ An Arduino library that runs [Pure Data](https://puredata.info/) (Pd) patches on
 
 Build audio synthesisers, effects, and interactive sound installations by designing patches in Pd on your computer, then running them on an ESP32 with real-time parameter control from GPIO, sensors, or serial.
 
-Adapted from [ESPd](https://msp.ucsd.edu/ideas/2024.09.18.espd/index.htm) by Miller Puckette for the Arduino IDE.
+Adapted for the Arduino IDE from [ESPd](https://msp.ucsd.edu/ideas/2024.09.18.espd/index.htm) by Miller Puckette.
 
 ## Features
 
