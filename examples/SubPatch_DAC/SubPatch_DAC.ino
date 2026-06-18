@@ -2,8 +2,9 @@
  * Subpatch_DAC - ESPdLib Subpatch and Internal DAC Example
  *
  * Plays a 440 Hz square wave through the ESP32's internal DAC (8-bit).
- * Demonstrates that subpatches within a Pd patch work with ESPdLib
- * Tests show that abstractions do to get recognised in ESPdLib, sadly.
+ * Demonstrates that subpatches within a Pd patch work with ESPdLib.
+ * (Standalone .pd abstractions are now supported too — see the
+ * Abstraction example.)
  * Upload the data/ folder to LittleFS first:
  *   Cmd+Shift+P -> "Upload LittleFS to Pico/ESP8266/ESP32"
  *   Ensure that no Arduino sketch has the Serial Monitor open

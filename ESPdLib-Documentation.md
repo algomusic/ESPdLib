@@ -31,7 +31,7 @@ ESPdLib is an Arduino library that runs the [Pure Data](https://puredata.info/) 
                  ▼
 ┌─────────────────────────────────────────────────┐
 │  libpd / Pure Data Engine                       │
-│  - 77 wrapper .c files → 106 Pd source .inc     │
+│  - 78 wrapper .c files → 106 Pd source .inc     │
 │  - pd_esp32_sched.c (pthread-free scheduler)    │
 │  - pd_esp32_stubs.c (stubs for excluded files)  │
 └────────────────┬────────────────────────────────┘
@@ -64,7 +64,7 @@ ESPdLib/
 │   ├── pd_esp32_stubs.c            # Stubs for excluded Pd files (GUI, net, loader)
 │   └── pure_data/
 │       ├── pd_d_arithmetic.c        # ─┐
-│       ├── pd_d_array.c             #  │ 77 thin wrapper files, each 2 lines:
+│       ├── pd_d_array.c             #  │ 78 thin wrapper files, each 2 lines:
 │       ├── pd_d_ctl.c               #  │   #include "../pd_build_defines.h"
 │       ├── ...                       #  │   #include "src/d_arithmetic.inc"
 │       └── pd_z_ringbuffer.c        # ─┘
@@ -122,14 +122,20 @@ Solution: `pd_esp32_sched.c` replaces `m_sched.c` with a pthread-free implementa
 
 ### Why stubs (pd_esp32_stubs.c)?
 
-Five Pd source files can't compile on ESP32 due to missing system headers or functionality:
+Four Pd source files can't compile on ESP32 due to missing system headers or functionality:
 - `s_inter.c` — GUI interaction, `sys/mman.h`
 - `s_main.c` — standalone Pd `main()`, not needed with libpd
-- `s_loader.c` — dynamic library loading (`dlopen`)
 - `s_net.c` — socket networking
 - `x_net.c` — Pd `[netsend]`/`[netreceive]` objects
 
 These are excluded (no wrapper files), and `pd_esp32_stubs.c` provides empty/minimal implementations for the symbols they would have defined.
+
+`s_loader.c` **is** compiled in (via `pd_s_loader.c`) so that `.pd` abstractions
+are found and instantiated at runtime. Its binary-external code-paths (`dlopen`/
+`LoadLibrary`) compile away because `HAVE_LIBDL` and `_WIN32` are undefined on
+ESP32, so only the abstraction loader is actually active. The one symbol it needs
+from the excluded `s_inter.c` — `sys_deken_specifier()` — is stubbed in
+`pd_esp32_stubs.c` to return `NULL`, which yields an empty binary-extension list.
 
 ### What's excluded?
 
@@ -257,7 +263,8 @@ Key constraints:
 - No GUI objects (`floatatom`, `vu`, etc.) — there's no GUI on ESP32. Use `[r name]` instead.
 - No `[netsend]`/`[netreceive]` — networking objects are excluded
 - No FFT objects (`[rfft~]`, `[ifft~]`, etc.) — FFT is excluded to save code space
-- No external libraries (`[declare -lib ...]`) — dynamic loading is excluded
+- No external libraries (`[declare -lib ...]`) — binary externals (`.so`/`.dll`) can't be dynamically loaded
+- `.pd` abstractions **are** supported — any object referenced by name that has a matching `<name>.pd` file will be loaded. The abstraction file must be uploaded to LittleFS alongside the parent patch (same directory, or a directory added via the Pd search path). See the `Abstraction` example.
 
 ## Getting Patches onto the ESP32
 
@@ -510,7 +517,7 @@ float freq = (prevFreq * 9 + newReading) / 10.0;  // Simple low-pass filter
 
 - **Single Pd instance** — `PDINSTANCE` is not enabled; one Pd engine runs at a time
 - **No FFT** — `[rfft~]`, `[ifft~]`, `[fft~]` objects are excluded
-- **No externals** — dynamic library loading (`dlopen`) is not available on ESP32
+- **No binary externals** — dynamic library loading (`dlopen`) of compiled `.so`/`.dll` objects is not available on ESP32. **`.pd` abstractions are supported**, however — upload the abstraction `.pd` file to LittleFS alongside the patch that references it.
 - **No networking** — `[netsend]`, `[netreceive]` objects are excluded
 - **No MIDI hardware** — MIDI I/O objects exist but aren't connected to hardware
 - **No GUI** — headless only; use `[r name]`/`[s name]` for all parameter exchange

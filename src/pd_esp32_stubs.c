@@ -98,8 +98,22 @@ int sys_batch = 0;
 
 /* ===================== s_loader.c stubs ===================== */
 
-int sys_load_lib(t_canvas *canvas, const char *classname) { return 0; }
-/* class_set_extern_dir is defined in m_class.c */
+/* sys_load_lib() is now provided by the real loader in
+   pure_data/pd_s_loader.c (which includes s_loader.inc), so that .pd
+   abstractions are found and instantiated at runtime. Only one symbol
+   still needs a stub: sys_deken_specifier() is normally defined in
+   s_inter.c, which is excluded from this build. Returning NULL makes
+   sys_get_dllextensions() produce an empty extension list, so binary
+   external loading (.so/.dll) is silently skipped while .pd abstraction
+   loading — the only thing we need — works normally.
+   class_set_extern_dir is defined in m_class.c. */
+#include <stddef.h>
+const char *sys_deken_specifier(char *buf, size_t bufsize,
+                                int include_floatsize, int cpu)
+{
+    (void)buf; (void)bufsize; (void)include_floatsize; (void)cpu;
+    return NULL;
+}
 
 /* ===================== s_net.c stubs ===================== */
 
