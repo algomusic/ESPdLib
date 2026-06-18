@@ -77,6 +77,10 @@ bool ESPdLib::begin(const Config& config) {
     _impl->config = config;
     s_impl = _impl;
 
+    // Create the Pd lock before any Pd call or the audio task. It serializes
+    // the DSP perform against patch open/close and array/bind mutations.
+    pdw_lock_init();
+
     // Configure PSRAM if requested and available
     if (config.usePSRAM) {
         if (psramFound()) {
@@ -192,7 +196,11 @@ void ESPdLib::end() {
 
 void* ESPdLib::openPatch(const char* filename, const char* dir) {
     if (!_impl) return nullptr;
+    // Lock against the audio task: opening builds the DSP graph and may tear
+    // it down/rebuild it (e.g. cosinesum from [loadbang]).
+    pdw_lock();
     void* patch = pdw_openfile(filename, dir);
+    pdw_unlock();
     if (!patch) {
         Serial.printf("ESPdLib: failed to open patch %s/%s\n", dir, filename);
     }
@@ -201,7 +209,9 @@ void* ESPdLib::openPatch(const char* filename, const char* dir) {
 
 void ESPdLib::closePatch(void* patch) {
     if (patch) {
+        pdw_lock();
         pdw_closefile(patch);
+        pdw_unlock();
     }
 }
 
@@ -255,7 +265,10 @@ void ESPdLib::onPrint(PdPrintCallback callback) {
 
 void ESPdLib::subscribe(const char* source) {
     if (!_impl || _impl->numSubs >= PD_MAX_SUBSCRIPTIONS) return;
+    // pdw_bind mutates the receiver table the audio task reads during dispatch.
+    pdw_lock();
     void* handle = pdw_bind(source);
+    pdw_unlock();
     if (handle) {
         _impl->subs[_impl->numSubs].name = source;
         _impl->subs[_impl->numSubs].handle = handle;
@@ -267,7 +280,9 @@ void ESPdLib::unsubscribe(const char* source) {
     if (!_impl) return;
     for (int i = 0; i < _impl->numSubs; i++) {
         if (strcmp(_impl->subs[i].name, source) == 0) {
+            pdw_lock();
             pdw_unbind(_impl->subs[i].handle);
+            pdw_unlock();
             // Shift remaining entries
             for (int j = i; j < _impl->numSubs - 1; j++) {
                 _impl->subs[j] = _impl->subs[j + 1];
@@ -281,11 +296,19 @@ void ESPdLib::unsubscribe(const char* source) {
 // --- Array access ---
 
 int ESPdLib::readArray(float* dest, const char* name, int offset, int n) {
-    return pdw_read_array(dest, name, offset, n);
+    // Lock against the audio task, which may be reading/writing the same
+    // array memory inside the DSP perform.
+    pdw_lock();
+    int r = pdw_read_array(dest, name, offset, n);
+    pdw_unlock();
+    return r;
 }
 
 int ESPdLib::writeArray(const char* name, int offset, const float* src, int n) {
-    return pdw_write_array(name, offset, src, n);
+    pdw_lock();
+    int r = pdw_write_array(name, offset, src, n);
+    pdw_unlock();
+    return r;
 }
 
 // --- Status ---
@@ -367,10 +390,8 @@ void ESPdLib::audioTaskFunc(void* param) {
     const float tickUs = (float)PD_BLOCK_SIZE / impl->config.sampleRate * 1000000.0f;
 
     while (impl->running) {
-        // Drain queued messages from the main thread
-        self->drainMessageQueue();
-
-        // Read audio input if configured (convert int16 from I2S to float for Pd)
+        // Read audio input if configured (convert int16 from I2S to float for Pd).
+        // I2S DMA read can block; keep it outside the Pd lock.
         if (inChannels > 0) {
             int16_t inI2sBuf[PD_BLOCK_SIZE * 2];
             pd_audio_read(inI2sBuf, inSamples);
@@ -379,10 +400,16 @@ void ESPdLib::audioTaskFunc(void* param) {
             }
         }
 
-        // Process one Pd tick (64 samples) using float precision
+        // Drain queued messages and run one Pd tick (64 samples) under the lock,
+        // so patch open/close and array/bind mutations on the loop task can't
+        // alter the DSP graph mid-perform (e.g. cosinesum rebuilding the graph
+        // from [loadbang] during openPatch).
+        pdw_lock();
+        self->drainMessageQueue();
         unsigned long t0 = micros();
         pdw_process_float(1, inFloatBuf, outFloatBuf);
         unsigned long elapsed = micros() - t0;
+        pdw_unlock();
         impl->cpuLoad = (float)elapsed / tickUs;
 
         // Convert float (-1.0..1.0) to int16 with clamping

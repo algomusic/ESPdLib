@@ -234,6 +234,38 @@ Pd.isRunning();    // true if audio task is active
 Pd.getCpuLoad();   // Fraction of audio deadline used (0.0 - 1.0+)
 ```
 
+## Thread Safety
+
+The DSP perform runs continuously on the audio task while your sketch runs on
+the Arduino loop task. Anything that touches Pd state from `loop()` must be
+serialized against that perform, or a patch change can mutate the DSP graph
+mid-tick and fault (e.g. `cosinesum` from `[loadbang]` rebuilding the graph
+during `openPatch()`).
+
+ESPdLib handles this for you with an internal recursive mutex (a real
+implementation of Pd's `sys_lock()`/`sys_unlock()`, which are no-ops in a stock
+headless build):
+
+- `sendFloat()` / `sendBang()` / `sendSymbol()` are lock-free — they enqueue to
+  an SPSC ring buffer that the audio task drains at the top of each tick.
+- `openPatch()`, `closePatch()`, `subscribe()`, `unsubscribe()`, `readArray()`
+  and `writeArray()` take the lock around the Pd call, so they are safe to call
+  from `loop()` at any time.
+- The lock wraps only the message drain and `libpd_process` in the audio task —
+  **not** the blocking I2S read/write — so steady-state overhead is a single
+  uncontended mutex op per tick.
+
+Practical consequence: while a patch loads, the audio task blocks on the lock,
+so **audio briefly pauses during `openPatch()`/`closePatch()`** (longer for
+patches with abstractions). This is expected — the graph can't be performed
+while it's being rebuilt. The mutex uses priority inheritance, so the
+high-priority audio task boosts the loop task to finish the load promptly.
+
+Callbacks (`onFloat`, `onBang`, `onPrint`) fire from the audio task while it
+holds the lock. Calling `openPatch()`/`writeArray()`/etc. from inside a callback
+is safe (the mutex is recursive) but keep callbacks fast — you are inside the
+audio deadline.
+
 ## Pd Patch Design for ESP32
 
 Patches must use `[receive]` (or `[r]`) objects to accept values from Arduino code:
@@ -513,11 +545,70 @@ ESP32 ADC is inherently noisy. Use software smoothing:
 float freq = (prevFreq * 9 + newReading) / 10.0;  // Simple low-pass filter
 ```
 
+## Abstractions
+
+ESPdLib loads `.pd` abstractions — objects referenced by name (e.g. `[square]`)
+that resolve to a matching `square.pd` file. The abstraction file must be on
+LittleFS in the same directory as the parent patch (or on a directory added to
+the Pd search path). See the `Abstraction` example. Two things bite in practice:
+
+### Increase the loop task stack before loading abstractions
+
+`openPatch()` runs **synchronously on the Arduino `loopTask`**, whose default
+stack is only 8 KB. Abstraction instantiation recurses through libpd's
+`binbuf_evalfile` (one level per nesting depth), and nested or multiple
+abstractions overflow that 8 KB stack — typically a `Guru Meditation` /
+stack-canary crash *inside* `openPatch()`.
+
+Fix: raise the loop task stack at the top of your sketch, **outside** any
+function:
+
+```cpp
+SET_LOOP_TASK_STACK_SIZE(64 * 1024);   // 64 KB; abstractions need the headroom
+
+void setup() { ... }
+```
+
+This only affects the task that runs `setup()`/`loop()` (where you call
+`openPatch()`); the audio task uses its own `config.audioTaskStack`.
+
+### Instance count is bounded by internal SRAM, not a config knob
+
+Each abstraction instance is a full sub-canvas: dozens of small allocations
+(objects ~50–200 B, connections, signal vectors). There is **no fixed buffer to
+raise** — you are spending internal SRAM heap (~200–240 KB total), and complex
+or numerous abstractions exhaust it (commonly after only a handful of instances).
+
+Note that **PSRAM does not help by default**: per-object allocations are smaller
+than the default `psramMinAllocSize` (512 B), so they stay in internal SRAM
+regardless of `config.usePSRAM`. To push more of them into PSRAM, lower the
+threshold:
+
+```cpp
+config.usePSRAM = true;
+config.psramMinAllocSize = 64;   // route small per-object allocs to PSRAM too
+```
+
+This raises the ceiling at the cost of CPU on every object access (worse on
+standard ESP32's slow quad-SPI PSRAM than on the S3's octal-SPI). Measure both
+sides before committing:
+
+```cpp
+// internal SRAM is the real constraint — watch it across openPatch()
+Serial.printf("free internal: %u, free PSRAM: %u\n",
+    heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+    heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+```
+
+If internal free drops sharply per instance while PSRAM barely moves, you are
+SRAM-bound and lowering `psramMinAllocSize` (or simplifying the abstractions) is
+the only lever. Keep an eye on `Pd.getCpuLoad()` after lowering the threshold.
+
 ## Known Limitations
 
 - **Single Pd instance** — `PDINSTANCE` is not enabled; one Pd engine runs at a time
 - **No FFT** — `[rfft~]`, `[ifft~]`, `[fft~]` objects are excluded
-- **No binary externals** — dynamic library loading (`dlopen`) of compiled `.so`/`.dll` objects is not available on ESP32. **`.pd` abstractions are supported**, however — upload the abstraction `.pd` file to LittleFS alongside the patch that references it.
+- **No binary externals** — dynamic library loading (`dlopen`) of compiled `.so`/`.dll` objects is not available on ESP32. **`.pd` abstractions are supported**, however — upload the abstraction `.pd` file to LittleFS alongside the patch that references it. See the [Abstractions](#abstractions) section for the loop-task-stack requirement and instance-count limits.
 - **No networking** — `[netsend]`, `[netreceive]` objects are excluded
 - **No MIDI hardware** — MIDI I/O objects exist but aren't connected to hardware
 - **No GUI** — headless only; use `[r name]`/`[s name]` for all parameter exchange

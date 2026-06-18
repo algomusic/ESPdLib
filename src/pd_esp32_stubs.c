@@ -24,6 +24,9 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
 /* ===================== s_inter.c stubs ===================== */
 
 void sys_vgui(const char *format, ...) {}
@@ -33,10 +36,36 @@ int sys_havegui(void) { return 0; }
 int sys_havetkproc(void) { return 0; }
 int sys_pollgui(void) { return 0; }
 
-void sys_lock(void) {}
-void sys_unlock(void) {}
-void pd_globallock(void) {}
-void pd_globalunlock(void) {}
+/* Pd's global lock. On stock Pd these are pthread mutexes from s_inter.c
+   (excluded here). ESPdLib runs the DSP perform on a dedicated FreeRTOS
+   audio task while patches are opened/closed (and arrays/binds mutated) on
+   the Arduino loop task, so graph mutations must be serialized against the
+   perform — otherwise e.g. cosinesum-at-loadbang can rebuild the DSP graph
+   while the audio task is mid-perform, faulting on freed structures.
+   All four entry points share one recursive mutex (recursive because Pd may
+   re-enter sys_lock() while a caller on the same task already holds it).
+   The mutex has priority inheritance, so the high-priority audio task can't
+   be starved by the lower-priority loop task holding the lock during a load. */
+static SemaphoreHandle_t pd_global_mutex = NULL;
+
+void pd_esp32_lock_init(void)
+{
+    if (!pd_global_mutex)
+        pd_global_mutex = xSemaphoreCreateRecursiveMutex();
+}
+
+void sys_lock(void)
+{
+    if (pd_global_mutex)
+        xSemaphoreTakeRecursive(pd_global_mutex, portMAX_DELAY);
+}
+void sys_unlock(void)
+{
+    if (pd_global_mutex)
+        xSemaphoreGiveRecursive(pd_global_mutex);
+}
+void pd_globallock(void) { sys_lock(); }
+void pd_globalunlock(void) { sys_unlock(); }
 
 void sys_queuegui(void *client, t_glist *glist, t_guicallbackfn f) {}
 void sys_unqueuegui(void *client) {}

@@ -28,6 +28,12 @@
 
 #include <ESPdLib.h>
 
+// openPatch() loads abstractions on the Arduino loopTask, and libpd's
+// binbuf_evalfile recurses one level per nesting depth. The default 8 KB
+// loopTask stack can overflow with nested/multiple abstractions, crashing
+// inside openPatch(). Raise it here (must be at file scope, not in setup()).
+SET_LOOP_TASK_STACK_SIZE(64 * 1024);
+
 void setup() {
     Serial.begin(115200);
     delay(1000);

@@ -10,6 +10,18 @@
 #include "pure_data/src/z_libpd.h"
 #include "pure_data/src/z_queued.h"
 
+/* ===== Thread lock ===== */
+/* Backed by a recursive FreeRTOS mutex in pd_esp32_stubs.c (where the real
+   sys_lock/sys_unlock live). Declared extern here to avoid pulling Pd's
+   internal headers into this isolation layer. */
+extern void pd_esp32_lock_init(void);
+extern void sys_lock(void);
+extern void sys_unlock(void);
+
+void pdw_lock_init(void) { pd_esp32_lock_init(); }
+void pdw_lock(void)      { sys_lock(); }
+void pdw_unlock(void)    { sys_unlock(); }
+
 /* ===== Init & Audio ===== */
 
 int pdw_init(void) {

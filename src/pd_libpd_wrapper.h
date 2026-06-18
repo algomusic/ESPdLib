@@ -15,6 +15,13 @@ typedef void (*pdw_printhook)(const char *s);
 typedef void (*pdw_banghook)(const char *recv);
 typedef void (*pdw_floathook)(const char *recv, float x);
 
+/* Thread lock — serializes the DSP perform (audio task) against patch
+   open/close and array/bind mutations (loop task). Call pdw_lock_init()
+   once before starting the audio task. */
+void pdw_lock_init(void);
+void pdw_lock(void);
+void pdw_unlock(void);
+
 /* Init & Audio */
 int pdw_init(void);
 int pdw_init_audio(int inChannels, int outChannels, int sampleRate);
