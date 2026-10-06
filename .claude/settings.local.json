@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(arduino-cli version:*)",
+      "Bash(arduino-cli board:*)",
+      "Bash(arduino-cli compile:*)",
+      "Bash(ls src/pure_data/pd_s_*.c)",
+      "Bash(ls -la src/pure_data/src/s_loader.inc src/pure_data/src/s_inter.inc)",
+      "Bash(sed -n '/^void canvas_update_dsp/,/^}/p' src/pure_data/src/g_canvas.inc)",
+      "Bash(sed -n '/static void gfxstub_deleteforkey/,/^}/p' src/pure_data/src/x_gui.inc)"
+    ]
+  }
+}

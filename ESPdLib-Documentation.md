@@ -77,15 +77,16 @@ ESPdLib/
 │           ├── ...                   #  │ (pristine copies from pd-0.56-2/src/)
 │           └── z_ringbuffer.inc      # ─┘
 ├── examples/
-│   ├── SimpleExample/
-│   │   ├── SimpleExample.ino        # Main example with pot control + serial switching
-│   │   └── data/
-│   │       ├── simple-sinewave.pd   # Sine wave patch using [osc~]
-│   │       └── simple-phasor.pd     # Phasor patch with [lop~] filter
-│   └── GpioControl/
-│       ├── GpioControl.ino          # Multi-oscillator example with GPIO + LED
-│       └── data/
-│           └── gpio-patch.pd
+│   ├── EmbeddedPatch/               # Embedded Pd patch and optional audio-device setup
+│   ├── ASineTone/                   # Simple Pd patch playback
+│   ├── SimpleSinewave/              # Pd patch playback
+│   ├── SimplePhasor/                # Pd patch playback
+│   ├── SimpleSequence/              # Pd sequencing example
+│   ├── GpioControl/                 # GPIO control example
+│   ├── Abstraction/                 # Pd abstraction loading example
+│   ├── SwitchPatches/               # LittleFS patch switching
+│   ├── ASineTone_DAC/               # ESP32 internal DAC output
+│   └── SubPatch_DAC/                # Internal DAC and subpatch example
 └── scripts/
     ├── update_pd.sh                 # Update Pd sources from a new version
     ├── upload_patch.py              # Send .pd files to ESP32 over serial
@@ -157,6 +158,13 @@ config.bclkPin = 38;              // I2S bit clock pin
 config.wsPin = 39;                // I2S word select pin
 config.doutPin = 40;              // I2S data out pin
 config.dinPin = -1;               // I2S data in pin (-1 = disabled)
+config.mclkPin = -1;              // Master clock (-1 unless codec/mic needs it)
+config.i2cSdaPin = 11;            // I2C data pin for optional audio devices
+config.i2cSclPin = 10;             // I2C clock pin
+config.useES8311Codec = false;     // Optional ES8311 DAC/codec
+config.useES7210Mic = false;       // Optional ES7210 stereo microphone ADC
+config.useTCA9555Amp = false;      // Optional TCA9555 speaker amplifier control
+config.es8311VolumeDb = -6;        // ES8311 hardware output level
 config.audioTaskCore = 1;         // FreeRTOS core for audio
 config.audioTaskPriority = 20;    // Task priority (high)
 config.audioTaskStack = 8192;     // Stack size in bytes
@@ -166,6 +174,49 @@ config.psramMinAllocSize = 512;   // Threshold in bytes (default 512)
 Pd.begin(config);                 // Initialize everything
 Pd.end();                         // Shutdown and release resources
 ```
+
+The external-I2S examples define beginner-editable `USE_ES8311_CODEC`,
+`USE_ES7210_MIC`, and `USE_TCA9555_AMP` switches, all set to `false` by
+default. They copy these values into `Config`. `USE_WAVESHARE_PINOUT` separately
+selects the Waveshare ESP32-S3-AUDIO-Board wiring (BCLK=13, WS=14, DOUT=16,
+DIN=15, MCLK=12; I2C SDA=11, SCL=10). Keep the pin map selection separate from
+the device switches when using the same codec or microphone on another board.
+
+### Optional I2C Audio Devices
+
+Include `ESPdLibCodecs.h` when using the low-level runtime controls. The
+ES8311, ES7210, and TCA9555 can be enabled independently. The ES8311 and
+ES7210 setup currently requires 44.1 kHz, stereo output, 16-bit Philips I2S,
+and a 256fs MCLK. Configure `mclkPin` for both devices. The ES7210 also needs
+an I2S `dinPin`; enabling it configures two input channels automatically.
+These restrictions are validated by `Pd.begin(config)`, which returns `false`
+if the required settings are missing or incompatible.
+
+If the TCA9555 amplifier is enabled, ESPdLib first disables the speaker amp,
+initializes the codec and microphone, then enables the amp after successful
+setup. If device initialization fails, `Pd.begin()` returns `false` and the
+amp remains disabled. The ES8311 and ES7210 require external I2S; they cannot
+be combined with `useInternalDAC`. TCA9555 amplifier control can be used
+independently.
+
+The sketch may set `config.es8311VolumeDb` before `Pd.begin()` (-6 dB is the
+default). Runtime hardware controls are static calls:
+
+```cpp
+#include <ESPdLibCodecs.h>
+
+ESPdLibCodecs::es8311SetVolumeDb(-12);  // Hardware DAC gain, in dB
+ESPdLibCodecs::es8311Mute(true);        // Mute/unmute the ES8311
+ESPdLibCodecs::es7210SetMicGainDb(24);  // Set all ES7210 microphone channels
+ESPdLibCodecs::tca9555SpeakerEnable(false); // Disable/enable the speaker amp
+```
+
+When an optional device is enabled, `Pd.begin()` initializes I2C. If all
+devices are disabled but you still need a runtime control, initialize I2C
+yourself with `ESPdLibCodecs::beginI2C(sdaPin, sclPin)` first. Use these
+controls from `setup()` or `loop()`, not from Pd callbacks or real-time audio
+processing. See `examples/EmbeddedPatch/EmbeddedPatch.ino` for a complete,
+disabled-by-default configuration example.
 
 ### Patch Management
 

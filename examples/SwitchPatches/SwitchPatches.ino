@@ -40,13 +40,31 @@
  * ---- Hardware ----
  *
  *   - ESP32-S3 board
- *   - I2S DAC (e.g., MAX98357A or PCM5102) on pins BCLK=38, WS=39, DOUT=40
+ *   - I2S DAC (e.g., MAX98357A or PCM5102)
+ *   - Optional ES8311 codec, ES7210 microphones, and TCA9555 amplifier control
+ *     as used by the Waveshare ESP32-S3-AUDIO-Board
  *   - Potentiometer on GPIO1 (frequency)
  *   - Potentiometer on GPIO2 (amplitude)
  */
 
 #include <ESPdLib.h>
+#include <ESPdLibCodecs.h>
 #include <LittleFS.h>
+
+// Select the Waveshare ESP32-S3-AUDIO-Board pinout independently from the
+// optional ES8311 codec, ES7210 microphones, and TCA9555 amplifier control.
+// The component flags default to false for standard I2S DAC hardware.
+constexpr bool USE_WAVESHARE_PINOUT = false;
+constexpr bool USE_ES8311_CODEC = false;
+constexpr bool USE_ES7210_MIC = false;
+constexpr bool USE_TCA9555_AMP = false;
+
+constexpr int I2S_BCLK_PIN = USE_WAVESHARE_PINOUT ? 13 : 38;
+constexpr int I2S_WS_PIN = USE_WAVESHARE_PINOUT ? 14 : 39;
+constexpr int I2S_DOUT_PIN = USE_WAVESHARE_PINOUT ? 16 : 40;
+constexpr int I2S_DIN_PIN = USE_WAVESHARE_PINOUT ? 15 : -1;
+constexpr int I2S_MCLK_PIN = USE_WAVESHARE_PINOUT ? 12 : -1;
+constexpr int AUDIO_SAMPLE_RATE = (USE_ES8311_CODEC || USE_ES7210_MIC) ? 44100 : 48000;
 
 // ---- Configuration ----
 
@@ -67,7 +85,7 @@ static const char DEFAULT_PATCH[] =
     "#X obj 147 121 osc~ 440;\n"
     "#X obj 147 145 dac~;\n"
     "#X connect 0 0 1 0;\n"
-    "#X connect 0 0 1 1;\n"
+    "#X connect 0 0 1 1;\n";
 static const char DEFAULT_PATCH_NAME[] = "simple-sinewave.pd";
 
 // ---- Globals ----
@@ -175,13 +193,20 @@ void setup() {
 
     // Configure ESPdLib
     ESPdLib::Config config;
-    config.sampleRate = 48000;
+    config.sampleRate = AUDIO_SAMPLE_RATE;
     config.numOutputChannels = 2;
     config.numInputChannels = 0;
-    // ESP32-S3 I2S pins — adjust for your board
-    config.bclkPin = 38;
-    config.wsPin = 39;
-    config.doutPin = 40;
+    config.bclkPin = I2S_BCLK_PIN;
+    config.wsPin = I2S_WS_PIN;
+    config.doutPin = I2S_DOUT_PIN;
+    config.dinPin = I2S_DIN_PIN;
+    config.mclkPin = I2S_MCLK_PIN;
+    config.useES8311Codec = USE_ES8311_CODEC;
+    config.useES7210Mic = USE_ES7210_MIC;
+    config.useTCA9555Amp = USE_TCA9555_AMP;
+    config.i2cSclPin = 10;
+    config.i2cSdaPin = 11;
+    config.es8311VolumeDb = -9;
 
     // Initialize ESPdLib (mounts LittleFS, starts I2S, starts audio task)
     Serial.println("Initializing ESPdLib...");

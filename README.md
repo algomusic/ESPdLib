@@ -67,6 +67,7 @@ No FFT, networking, external libraries, or GUI objects -- headless audio only. S
 - Any ESP32 board (ESP32, S2, S3, C3, C6)
 - I2S DAC module (MAX98357A, PCM5102, UDA1334A, etc.)
 - Configurable I2S pins via `config.bclkPin`, `config.wsPin`, `config.doutPin`
+- Optional ES8311 DAC, ES7210 microphones and TCA9555 amplifier control.
 
 ### Internal DAC (no external hardware)
 
@@ -80,6 +81,38 @@ ESPdLib::Config config;
 config.useInternalDAC = true;
 Pd.begin(config);
 ```
+
+### I2C Audio Devices
+
+`ESPdLibCodecs.h` provides minimal I2C control for ES8311, ES7210 and TCA9555
+without a vendor audio library. Each device is independently optional through
+`useES8311Codec`, `useES7210Mic` and `useTCA9555Amp`. These devices are used on
+the Waveshare ESP32-S3-AUDIO-Board, but the drivers are not tied to that board;
+set the board's I2S and I2C pin numbers in `ESPdLib::Config`. The external-I2S
+examples use sketch-level switches so the board pin map stays separate from
+the selected audio devices:
+
+```cpp
+constexpr bool USE_WAVESHARE_PINOUT = false;
+constexpr bool USE_ES8311_CODEC = false;
+constexpr bool USE_ES7210_MIC = false;
+constexpr bool USE_TCA9555_AMP = false;
+```
+
+All switches default to `false`, preserving the standard external I2S DAC
+configuration. Set the pinout switch for the Waveshare ESP32-S3-AUDIO-Board
+mapping (BCLK=13, WS=14, DOUT=16, DIN=15, MCLK=12); its I2C pins are SDA=11
+and SCL=10. Other boards can use the codec or microphone with their own I2S
+and I2C pin assignments. Enabling the ES8311 or ES7210 requires 44.1 kHz,
+16-bit stereo Philips I2S with 256fs MCLK; the ES7210 enables two input
+channels. The `EmbeddedPatch` example demonstrates selecting these settings.
+
+The ES8311 starts at `config.es8311VolumeDb` (-6 dB by default). When enabled,
+the TCA9555 amplifier starts disabled and is enabled after device setup
+succeeds. The `ESPdLibCodecs` class also exposes runtime controls such as
+`es8311SetVolumeDb()`, `es8311Mute()`, `tca9555SpeakerEnable()` and
+`es7210SetMicGainDb()`. Keep I2C calls in `setup()` or `loop()`, outside
+real-time audio processing.
 
 ## Requirements
 

@@ -13,7 +13,7 @@ extern "C" {
 // Initialize I2S output (and optionally input) for audio streaming.
 // Returns true on success.
 bool pd_audio_init(int sampleRate, int numOutChannels, int numInChannels,
-                   int bclkPin, int wsPin, int doutPin, int dinPin);
+                   int bclkPin, int wsPin, int doutPin, int dinPin, int mclkPin);
 
 // Write interleaved 16-bit PCM samples to I2S. Blocks until DMA accepts the data.
 // numSamples = total sample count (frames * channels).

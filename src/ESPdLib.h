@@ -23,6 +23,15 @@ struct ESPdLibConfig {
     int wsPin             = 6;
     int doutPin           = 5;
     int dinPin            = -1;  // -1 = no audio input
+    // Optional audio devices; each I2C device can be enabled independently.
+    // ES8311/ES7210 currently require 44.1 kHz stereo I2S and 256fs MCLK.
+    bool useES8311Codec = false;
+    bool useES7210Mic = false;
+    bool useTCA9555Amp = false;
+    int mclkPin            = -1;
+    int i2cSdaPin          = 11;
+    int i2cSclPin          = 10;
+    int es8311VolumeDb     = -6;
     // Internal DAC output (ESP32 GPIO25/26, ESP32-S2 GPIO17/18)
     // When true, audio is routed to the chip's built-in 8-bit DAC instead of
     // an external I2S DAC. I2S pin settings are ignored. No audio input.

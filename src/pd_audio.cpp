@@ -36,7 +36,7 @@ static int s_dacOutChannels = 2;
 // =============================================================================
 
 bool pd_audio_init(int sampleRate, int numOutChannels, int numInChannels,
-                   int bclkPin, int wsPin, int doutPin, int dinPin) {
+                   int bclkPin, int wsPin, int doutPin, int dinPin, int mclkPin) {
     s_numOutChannels = numOutChannels;
     s_numInChannels = numInChannels;
 
@@ -76,6 +76,11 @@ bool pd_audio_init(int sampleRate, int numOutChannels, int numInChannels,
             },
         },
     };
+
+    if (mclkPin >= 0) {
+        std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
+        std_cfg.gpio_cfg.mclk = (gpio_num_t)mclkPin;
+    }
 
     err = i2s_channel_init_std_mode(s_tx_handle, &std_cfg);
     if (err != ESP_OK) return false;
@@ -199,7 +204,7 @@ void pd_audio_deinit_dac(void) {}
 
 #else
 // Stubs for non-ESP32 compilation (e.g., desktop testing)
-bool pd_audio_init(int, int, int, int, int, int, int) { return false; }
+bool pd_audio_init(int, int, int, int, int, int, int, int) { return false; }
 bool pd_audio_write(const int16_t*, size_t) { return false; }
 bool pd_audio_read(int16_t*, size_t) { return false; }
 void pd_audio_deinit(void) {}

@@ -2,6 +2,7 @@
 #include "pd_audio.h"
 #include "pd_message_queue.h"
 #include "pd_libpd_wrapper.h"
+#include "ESPdLibCodecs.h"
 
 #include <LittleFS.h>
 #include "esp_heap_caps.h"
@@ -72,9 +73,31 @@ ESPdLib::~ESPdLib() {
 
 bool ESPdLib::begin(const Config& config) {
     if (_impl) return false; // already initialized
+    const bool usesI2cAudio = config.useES8311Codec || config.useES7210Mic || config.useTCA9555Amp;
+    const bool usesCodecMclk = config.useES8311Codec || config.useES7210Mic;
+    if (usesCodecMclk) {
+        if (config.useInternalDAC || config.sampleRate != 44100 ||
+            config.numOutputChannels != 2 || config.mclkPin < 0) {
+            Serial.println("ESPdLib: ES8311/ES7210 currently require 44.1 kHz stereo I2S and an MCLK pin");
+            return false;
+        }
+        if (config.useES7210Mic && config.dinPin < 0) {
+            Serial.println("ESPdLib: ES7210 microphones require a configured I2S DIN pin");
+            return false;
+        }
+    }
+    if (usesI2cAudio && !ESPdLibCodecs::beginI2C(config.i2cSdaPin, config.i2cSclPin)) {
+        Serial.println("ESPdLib: audio device I2C initialization failed");
+        return false;
+    }
+    if (config.useTCA9555Amp && !ESPdLibCodecs::tca9555SpeakerEnable(false)) {
+        Serial.println("ESPdLib: TCA9555 amplifier initialization failed");
+        return false;
+    }
 
     _impl = new ESPdLibImpl();
     _impl->config = config;
+    if (config.useES7210Mic) _impl->config.numInputChannels = 2;
     s_impl = _impl;
 
     // Create the Pd lock before any Pd call or the audio task. It serializes
@@ -115,7 +138,7 @@ bool ESPdLib::begin(const Config& config) {
     }
 
     // Configure audio: input channels, output channels, sample rate
-    if (pdw_init_audio(config.numInputChannels, config.numOutputChannels, config.sampleRate)) {
+    if (pdw_init_audio(_impl->config.numInputChannels, config.numOutputChannels, config.sampleRate)) {
         Serial.println("ESPdLib: pdw_init_audio failed");
         delete _impl;
         _impl = nullptr;
@@ -142,14 +165,38 @@ bool ESPdLib::begin(const Config& config) {
         }
         Serial.println("ESPdLib: using internal DAC (8-bit output)");
     } else {
-        if (!pd_audio_init(config.sampleRate, config.numOutputChannels, config.numInputChannels,
-                           config.bclkPin, config.wsPin, config.doutPin, config.dinPin)) {
+        const int inputChannels = _impl->config.numInputChannels;
+        const int inputPin = config.dinPin;
+        const int mclkPin = usesCodecMclk ? config.mclkPin : -1;
+        if (!pd_audio_init(config.sampleRate, config.numOutputChannels, inputChannels,
+                           config.bclkPin, config.wsPin, config.doutPin, inputPin, mclkPin)) {
             Serial.println("ESPdLib: I2S init failed");
             delete _impl;
             _impl = nullptr;
             s_impl = nullptr;
             return false;
         }
+    }
+
+    bool devicesReady = true;
+    if (config.useES8311Codec) {
+        devicesReady = ESPdLibCodecs::es8311Setup(config.sampleRate) &&
+                       ESPdLibCodecs::es8311SetVolumeDb(config.es8311VolumeDb);
+    }
+    if (devicesReady && config.useES7210Mic)
+        devicesReady = ESPdLibCodecs::es7210Setup(config.sampleRate);
+    if (devicesReady && config.useTCA9555Amp)
+        devicesReady = ESPdLibCodecs::tca9555SpeakerEnable(true);
+    if (!devicesReady) {
+        if (config.useTCA9555Amp) ESPdLibCodecs::tca9555SpeakerEnable(false);
+        if (config.useInternalDAC) pd_audio_deinit_dac();
+        else pd_audio_deinit();
+        LittleFS.end();
+        delete _impl;
+        _impl = nullptr;
+        s_impl = nullptr;
+        Serial.println("ESPdLib: audio device setup failed");
+        return false;
     }
 
     // Start audio processing task
@@ -182,6 +229,7 @@ void ESPdLib::end() {
         _impl->audioTask = NULL;
     }
 
+    if (_impl->config.useTCA9555Amp) ESPdLibCodecs::tca9555SpeakerEnable(false);
     if (_impl->config.useInternalDAC) {
         pd_audio_deinit_dac();
     } else {
