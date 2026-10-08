@@ -12,6 +12,7 @@ Adapted for the Arduino IDE from [ESPd](https://msp.ucsd.edu/ideas/2024.09.18.es
 - Send/receive floats, bangs, and symbols between Arduino code and Pd patches
 - Stereo I2S audio output (16-bit, configurable sample rate)
 - Internal DAC output on ESP32/ESP32-S2 (8-bit, no external hardware needed)
+- CODEC support for Waveshare Smart Speaker
 - Dedicated FreeRTOS audio task for glitch-free playback
 - Thread-safe message queue for control from `loop()`
 - PSRAM support for large tables, delay lines, and samplers
