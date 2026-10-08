@@ -59,8 +59,8 @@ Patches must use `[receive]` objects (not GUI elements) to accept values from Ar
                         [r amp] --^
 ```
 
-No FFT, networking, external libraries, or GUI objects -- headless audio only. 
-Sub patches and abstractions are supported.
+- No FFT, networking, external libraries, or GUI objects -- headless audio only. 
+- Sub patches and abstractions are supported.
 
 ## Hardware
 
