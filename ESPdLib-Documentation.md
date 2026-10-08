@@ -175,7 +175,7 @@ Pd.begin(config);                 // Initialize everything
 Pd.end();                         // Shutdown and release resources
 ```
 
-The external-I2S examples define beginner-editable `USE_ES8311_CODEC`,
+The external-I2S examples define editable `USE_ES8311_CODEC`,
 `USE_ES7210_MIC`, and `USE_TCA9555_AMP` switches, all set to `false` by
 default. They copy these values into `Config`. `USE_WAVESHARE_PINOUT` separately
 selects the Waveshare ESP32-S3-AUDIO-Board wiring (BCLK=13, WS=14, DOUT=16,
